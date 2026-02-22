@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mcp-arena": {
+      "command": "node",
+      "args": ["/Users/soohongkim/Documents/workspace/personal/mcp-arena/apps/mcp-bridge/index.js"],
+      "env": {
+        "MCP_ARENA_API_BASE_URL": "http://127.0.0.1:5001/mcp-arena-local/us-central1/api"
+      }
+    }
+  }
+}

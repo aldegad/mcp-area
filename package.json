@@ -1,0 +1,20 @@
+{
+  "name": "mcp-arena",
+  "description": "MCP-connected robot battle arena prototype built with Firebase Functions and Next.js",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/functions",
+    "apps/web",
+    "apps/mcp-bridge"
+  ],
+  "scripts": {
+    "build:functions": "yarn workspace @mcp-arena/functions build",
+    "build:web": "yarn workspace @mcp-arena/web build",
+    "dev:functions": "yarn workspace @mcp-arena/functions serve",
+    "dev:mcp-bridge": "yarn workspace @mcp-arena/mcp-bridge dev",
+    "dev:web": "yarn workspace @mcp-arena/web dev",
+    "emulators": "firebase emulators:start --only hosting,functions,firestore,storage",
+    "lint": "yarn workspace @mcp-arena/web lint"
+  }
+}

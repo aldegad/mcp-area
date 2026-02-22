@@ -1,0 +1,9 @@
+{
+  "name": "@mcp-arena/mcp-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "dev": "node index.js"
+  }
+}
