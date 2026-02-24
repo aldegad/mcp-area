@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type {
+import {
+  buildRobotAvatarUrl,
   Battle,
   BattleActionLog,
   BattleBoostEffect,
@@ -351,16 +352,33 @@ function drawRobot(
   robot: RobotStateSnapshot,
   color: string,
   cellSize: number,
-  boardPx: number
+  boardPx: number,
+  avatarImage?: HTMLImageElement
 ): void {
   const cx = robot.x * cellSize + cellSize / 2;
   const cy = robot.y * cellSize + cellSize / 2;
-  const radius = cellSize * 0.3;
+  const radius = cellSize * 0.32;
 
   ctx.beginPath();
-  ctx.fillStyle = robot.alive ? color : "#999";
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.closePath();
+
+  if (avatarImage) {
+    ctx.save();
+    ctx.clip();
+    ctx.drawImage(avatarImage, cx - radius, cy - radius, radius * 2, radius * 2);
+    if (!robot.alive) {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+      ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+    }
+    ctx.restore();
+    ctx.lineWidth = Math.max(2, Math.floor(cellSize * 0.06));
+    ctx.strokeStyle = robot.alive ? color : "#7d7d7d";
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = robot.alive ? color : "#999";
+    ctx.fill();
+  }
 
   const angle = directionAngleRad(robot);
   const dx = Math.cos(angle) * radius * 0.95;
@@ -515,8 +533,30 @@ function ReplayArena({ battle }: { battle: Battle | null }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [frameIndex, setFrameIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [robotAvatarImages, setRobotAvatarImages] = useState<Record<string, HTMLImageElement>>({});
 
   const frames = useMemo(() => buildFrames(battle), [battle]);
+  const replayRobotIds = useMemo(() => {
+    if (!battle) {
+      return [];
+    }
+
+    const ids = new Set<string>();
+    const candidates = [
+      battle.robotAId,
+      battle.robotBId,
+      battle.initialState?.robotA?.id,
+      battle.initialState?.robotB?.id,
+    ];
+
+    candidates.forEach((id) => {
+      if (typeof id === "string" && id.trim()) {
+        ids.add(id);
+      }
+    });
+
+    return Array.from(ids.values());
+  }, [battle?.id, battle?.robotAId, battle?.robotBId, battle?.initialState?.robotA?.id, battle?.initialState?.robotB?.id]);
   const maxFrameIndex = Math.max(0, frames.length - 1);
   const safeFrameIndex = Math.min(frameIndex, maxFrameIndex);
   const arenaSize = Number(battle?.arenaSize) || 10;
@@ -535,11 +575,56 @@ function ReplayArena({ battle }: { battle: Battle | null }) {
   useEffect(() => {
     setFrameIndex(0);
     setIsPlaying(false);
+    setRobotAvatarImages({});
   }, [battle?.id]);
 
   useEffect(() => {
     setFrameIndex((prev) => Math.min(prev, maxFrameIndex));
   }, [maxFrameIndex]);
+
+  useEffect(() => {
+    if (!replayRobotIds.length) {
+      return;
+    }
+
+    let cancelled = false;
+    const disposers: Array<() => void> = [];
+
+    replayRobotIds.forEach((robotId) => {
+      const image = new Image();
+      image.decoding = "async";
+
+      const handleLoad = () => {
+        if (cancelled) {
+          return;
+        }
+
+        setRobotAvatarImages((prev) => ({
+          ...prev,
+          [robotId]: image,
+        }));
+      };
+      const handleError = () => {
+        if (cancelled) {
+          return;
+        }
+      };
+
+      image.addEventListener("load", handleLoad);
+      image.addEventListener("error", handleError);
+      image.src = buildRobotAvatarUrl(robotId);
+
+      disposers.push(() => {
+        image.removeEventListener("load", handleLoad);
+        image.removeEventListener("error", handleError);
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      disposers.forEach((dispose) => dispose());
+    };
+  }, [replayRobotIds]);
 
   useEffect(() => {
     if (!isPlaying || frames.length <= 1) {
@@ -578,12 +663,12 @@ function ReplayArena({ battle }: { battle: Battle | null }) {
     drawVisionCone(ctx, frame.state.robotB, "rgba(175, 42, 42, 0.12)", cellSize, visionRadius);
     drawShotRangeCone(ctx, frame.state.robotA, "#2e7d5b", cellSize, shotRange);
     drawShotRangeCone(ctx, frame.state.robotB, "#af2a2a", cellSize, shotRange);
-    drawRobot(ctx, frame.state.robotA, "#2e7d5b", cellSize, boardPx);
-    drawRobot(ctx, frame.state.robotB, "#af2a2a", cellSize, boardPx);
+    drawRobot(ctx, frame.state.robotA, "#2e7d5b", cellSize, boardPx, robotAvatarImages[frame.state.robotA.id]);
+    drawRobot(ctx, frame.state.robotB, "#af2a2a", cellSize, boardPx, robotAvatarImages[frame.state.robotB.id]);
 
     frame.boostEffects.forEach((effect) => drawBoostEffect(ctx, effect, cellSize));
     frame.projectiles.forEach((projectile) => drawProjectile(ctx, projectile, cellSize));
-  }, [frames, safeFrameIndex, boardPx, cellSize, visionRadius, shotRange]);
+  }, [frames, safeFrameIndex, boardPx, cellSize, visionRadius, shotRange, robotAvatarImages]);
 
   if (!battle || !frames.length) {
     return null;
