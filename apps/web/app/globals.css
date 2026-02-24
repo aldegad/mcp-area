@@ -133,12 +133,40 @@ button:disabled {
 }
 
 .robot-list li {
-  display: grid;
-  gap: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 10px;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.robot-meta {
+  min-width: 0;
+  display: grid;
+  gap: 4px 8px;
+}
+
+.robot-avatar-wrap {
+  flex-shrink: 0;
+}
+
+.robot-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  border: 1px solid #d0c6b0;
+  background: linear-gradient(160deg, #f6f0e4, #ece3d0);
+  object-fit: cover;
+  display: block;
+}
+
+.robot-avatar-fallback {
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #4b4334;
 }
 
 .error-box {
@@ -155,6 +183,94 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
+}
+
+.battle-matchup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.battle-fighter {
+  flex: 1;
+  min-width: 140px;
+  padding: 10px 12px;
+  background: #fafaf6;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.battle-fighter-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fighter-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #d0c6b0;
+  background: #f6f0e4;
+  object-fit: cover;
+  display: block;
+  flex-shrink: 0;
+}
+
+.fighter-avatar-fallback {
+  display: grid;
+  place-items: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #4b4334;
+}
+
+.fighter-detail {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.battle-vs {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.battle-winner {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #eef7ee;
+  border: 1px solid #b6dab6;
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+
+.winner-label {
+  display: inline-block;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.winner-label.draw {
+  background: var(--muted);
+}
+
+.battle-meta {
+  font-size: 0.86rem;
+  color: var(--muted);
+  margin: 4px 0 0;
 }
 
 .replay-wrap {
@@ -206,6 +322,27 @@ button:disabled {
   margin-top: 8px;
   font-size: 0.86rem;
   color: var(--muted);
+}
+
+.tick-log-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.copy-btn {
+  width: auto;
+  min-width: 0;
+  padding: 5px 14px;
+  font-size: 0.82rem;
+  background: var(--ink);
+  color: #fff;
+  border-radius: 6px;
+}
+
+.copy-btn:active {
+  opacity: 0.7;
 }
 
 pre {

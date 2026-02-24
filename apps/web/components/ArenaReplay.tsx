@@ -392,29 +392,95 @@ function drawRobot(
   ctx.font = `${Math.max(10, Math.floor(cellSize * 0.18))}px IBM Plex Sans, sans-serif`;
   ctx.fillText(robot.robotName || robot.id, cx, labelY);
   if (typeof robot.energy === "number") {
-    ctx.font = `${Math.max(8, Math.floor(cellSize * 0.15))}px IBM Plex Sans, sans-serif`;
-    ctx.fillText(`E:${robot.energy.toFixed(0)}`, cx, Math.min(boardPx - 4, labelY + Math.max(10, Math.floor(cellSize * 0.18))));
+    const barWidth = Math.max(20, cellSize * 0.7);
+    const barHeight = Math.max(4, Math.floor(cellSize * 0.09));
+    const barY = Math.min(boardPx - barHeight - 2, labelY + Math.max(8, Math.floor(cellSize * 0.15)));
+    const barX = cx - barWidth / 2;
+    const energyRatio = Math.max(0, Math.min(1, robot.energy / 100));
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+    ctx.fillRect(barX, barY, barWidth, barHeight);
+
+    const energyColor =
+      energyRatio > 0.5 ? "#4caf50" : energyRatio > 0.2 ? "#ff9800" : "#e53935";
+    ctx.fillStyle = energyColor;
+    ctx.fillRect(barX, barY, barWidth * energyRatio, barHeight);
+
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.4)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barWidth, barHeight);
+
+    ctx.fillStyle = "#111";
+    ctx.font = `${Math.max(7, Math.floor(cellSize * 0.12))}px IBM Plex Sans, sans-serif`;
+    ctx.fillText(`${robot.energy.toFixed(0)}`, cx, barY + barHeight + Math.max(8, Math.floor(cellSize * 0.12)));
   }
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
 }
 
 function drawProjectile(ctx: CanvasRenderingContext2D, projectile: BattleProjectile, cellSize: number): void {
-  const fromX = projectile.from.x * cellSize + cellSize / 2;
-  const fromY = projectile.from.y * cellSize + cellSize / 2;
   const toX = projectile.to.x * cellSize + cellSize / 2;
   const toY = projectile.to.y * cellSize + cellSize / 2;
 
-  ctx.beginPath();
-  ctx.strokeStyle = projectile.hit ? "#c62828" : "#d17f18";
-  ctx.lineWidth = Math.max(2, Math.floor(cellSize * 0.08));
-  if (!projectile.hit) {
-    ctx.setLineDash([6, 4]);
+  if (projectile.hit) {
+    // 명중: 타격 지점에 폭발 이펙트
+    const r = Math.max(6, cellSize * 0.3);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(toX, toY, r, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(198, 40, 40, 0.35)";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(toX, toY, r * 0.5, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255, 80, 40, 0.6)";
+    ctx.fill();
+    ctx.lineWidth = Math.max(2, Math.floor(cellSize * 0.06));
+    ctx.strokeStyle = "#c62828";
+    // 십자 충격파
+    const arm = r * 1.2;
+    ctx.beginPath();
+    ctx.moveTo(toX - arm, toY);
+    ctx.lineTo(toX + arm, toY);
+    ctx.moveTo(toX, toY - arm);
+    ctx.lineTo(toX, toY + arm);
+    ctx.stroke();
+    ctx.restore();
+  } else {
+    // 비행 중: 물방울(teardrop) 모양 탄환
+    const fromX = projectile.from.x * cellSize + cellSize / 2;
+    const fromY = projectile.from.y * cellSize + cellSize / 2;
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const len = Math.hypot(dx, dy);
+    const angle = len > 0 ? Math.atan2(dy, dx) : 0;
+
+    const headR = Math.max(4, cellSize * 0.13);
+    const tailLen = headR * 2.8;
+
+    ctx.save();
+    ctx.translate(toX, toY);
+    ctx.rotate(angle);
+
+    // 물방울: 원형 머리 + 뾰족한 꼬리
+    ctx.beginPath();
+    ctx.arc(0, 0, headR, -Math.PI * 0.58, Math.PI * 0.58);
+    ctx.lineTo(-tailLen, 0);
+    ctx.closePath();
+
+    ctx.fillStyle = "#d17f18";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(160, 90, 0, 0.6)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // 하이라이트
+    ctx.beginPath();
+    ctx.arc(-headR * 0.2, -headR * 0.2, headR * 0.35, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255, 230, 160, 0.7)";
+    ctx.fill();
+
+    ctx.restore();
   }
-  ctx.moveTo(fromX, fromY);
-  ctx.lineTo(toX, toY);
-  ctx.stroke();
-  ctx.setLineDash([]);
 }
 
 function drawBoostEffect(ctx: CanvasRenderingContext2D, effect: BattleBoostEffect, cellSize: number): void {
@@ -451,6 +517,8 @@ function ReplayArena({ battle }: { battle: Battle | null }) {
   const [isPlaying, setIsPlaying] = useState(false);
 
   const frames = useMemo(() => buildFrames(battle), [battle]);
+  const maxFrameIndex = Math.max(0, frames.length - 1);
+  const safeFrameIndex = Math.min(frameIndex, maxFrameIndex);
   const arenaSize = Number(battle?.arenaSize) || 10;
   const visionRadius = Number(battle?.visionRadius) || 5;
   const shotRange = Number(battle?.shotRange) || 5;
@@ -468,6 +536,10 @@ function ReplayArena({ battle }: { battle: Battle | null }) {
     setFrameIndex(0);
     setIsPlaying(false);
   }, [battle?.id]);
+
+  useEffect(() => {
+    setFrameIndex((prev) => Math.min(prev, maxFrameIndex));
+  }, [maxFrameIndex]);
 
   useEffect(() => {
     if (!isPlaying || frames.length <= 1) {
@@ -490,7 +562,7 @@ function ReplayArena({ battle }: { battle: Battle | null }) {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const frame = frames[frameIndex];
+    const frame = frames[safeFrameIndex];
 
     if (!canvas || !frame) {
       return;
@@ -511,20 +583,23 @@ function ReplayArena({ battle }: { battle: Battle | null }) {
 
     frame.boostEffects.forEach((effect) => drawBoostEffect(ctx, effect, cellSize));
     frame.projectiles.forEach((projectile) => drawProjectile(ctx, projectile, cellSize));
-  }, [frames, frameIndex, boardPx, cellSize, visionRadius, shotRange]);
+  }, [frames, safeFrameIndex, boardPx, cellSize, visionRadius, shotRange]);
 
   if (!battle || !frames.length) {
     return null;
   }
 
-  const current = frames[frameIndex];
+  const current = frames[safeFrameIndex];
+  if (!current) {
+    return null;
+  }
 
   return (
     <div className="replay-wrap">
       <div className="replay-topbar">
         <strong>Replay</strong>
         <span>
-          Frame {frameIndex}/{Math.max(0, frames.length - 1)} · {frameIntervalMs.toFixed(2)}ms
+          Frame {safeFrameIndex}/{maxFrameIndex} · {frameIntervalMs.toFixed(2)}ms
         </span>
       </div>
 
@@ -537,13 +612,13 @@ function ReplayArena({ battle }: { battle: Battle | null }) {
       />
 
       <div className="replay-controls">
-        <button type="button" onClick={() => setFrameIndex(0)} disabled={frameIndex === 0}>
+        <button type="button" onClick={() => setFrameIndex(0)} disabled={safeFrameIndex === 0}>
           처음
         </button>
         <button
           type="button"
           onClick={() => setFrameIndex((prev) => Math.max(0, prev - 1))}
-          disabled={frameIndex === 0}
+          disabled={safeFrameIndex === 0}
         >
           이전
         </button>
@@ -553,14 +628,14 @@ function ReplayArena({ battle }: { battle: Battle | null }) {
         <button
           type="button"
           onClick={() => setFrameIndex((prev) => Math.min(frames.length - 1, prev + 1))}
-          disabled={frameIndex >= frames.length - 1}
+          disabled={safeFrameIndex >= maxFrameIndex}
         >
           다음
         </button>
         <button
           type="button"
           onClick={() => setFrameIndex(frames.length - 1)}
-          disabled={frameIndex >= frames.length - 1}
+          disabled={safeFrameIndex >= maxFrameIndex}
         >
           마지막
         </button>

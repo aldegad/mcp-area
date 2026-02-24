@@ -9,6 +9,7 @@ export interface Robot {
   rotationRules: string;
   attackRules: string;
   scriptPath: string;
+  robotImagePath: string | null;
   commandCount: number;
   createdAt: string | null;
   updatedAt: string | null;
@@ -29,6 +30,7 @@ export interface UploadRobotPayload {
   rotationRules: string;
   attackRules: string;
   script: string;
+  robotImageSvg?: string;
 }
 
 export interface RobotStateSnapshot {
@@ -224,6 +226,10 @@ function resolveBaseUrl(): string {
   }
 
   return DEFAULT_BASE_URL;
+}
+
+export function buildRobotAvatarUrl(robotId: string): string {
+  return `${resolveBaseUrl()}/robots/${encodeURIComponent(robotId)}/avatar`;
 }
 
 export async function apiRequest<TResponse>(path: string, options: RequestInit = {}): Promise<TResponse> {

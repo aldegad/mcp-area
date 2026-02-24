@@ -34,9 +34,9 @@ const EPSILON = 0.000001;
 const MEMORY_UNSEEN_TICKS_INITIAL = 9999;
 
 export const TICKS_PER_TILE = {
-  FORWARD: 8,
-  STRAFE: 12,
-  BACKWARD: 16,
+  FORWARD: 12,
+  STRAFE: 18,
+  BACKWARD: 24,
 } as const;
 
 const SPEED_PER_SECOND = {
@@ -46,7 +46,7 @@ const SPEED_PER_SECOND = {
 } as const;
 export const PROJECTILE_SPEED_TILES_PER_SECOND = 1 / ((PROJECTILE_TICKS_PER_TILE * TICK_DURATION_MS) / 1000);
 
-export const TURN_RATE_DEG_PER_SECOND = 360;
+export const TURN_RATE_DEG_PER_SECOND = 240;
 const TURN_RATE_RAD_PER_SECOND = (TURN_RATE_DEG_PER_SECOND * Math.PI) / 180;
 
 type Direction = (typeof DIRECTIONS)[number];

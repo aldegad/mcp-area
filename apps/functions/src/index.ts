@@ -43,6 +43,9 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 const enableCors = cors({ origin: true });
+const MAX_ROBOT_IMAGE_SVG_CHARS = 50_000;
+const MAX_ROBOT_IMAGE_SVG_BYTES = 50 * 1024;
+const ROBOT_IMAGE_CONTENT_TYPE = "image/svg+xml; charset=utf-8";
 
 const COLLABORATOR_SCHEMA = z.union([
   z.string().min(1).max(120),
@@ -61,6 +64,7 @@ const ROBOT_UPLOAD_SCHEMA = z.object({
   rotationRules: z.string().max(1000).default(""),
   attackRules: z.string().min(1).max(1000),
   script: z.string().min(1).max(10000),
+  robotImageSvg: z.string().max(MAX_ROBOT_IMAGE_SVG_CHARS).optional(),
 });
 
 const CREATE_BATTLE_SCHEMA = z
@@ -93,6 +97,7 @@ interface RobotResponseData {
   rotationRules: string;
   attackRules: string;
   scriptPath: string;
+  robotImagePath: string | null;
   commandCount: number;
   createdAt: string | null;
   updatedAt: string | null;
@@ -169,8 +174,56 @@ function serializeTimestamp(value: unknown): string | null {
   return null;
 }
 
+function normalizeRobotImageSvg(svgInput: string): string {
+  const svg = svgInput.trim();
+  if (!svg) {
+    throw new Error("robotImageSvg must not be empty when provided");
+  }
+
+  const byteLength = Buffer.byteLength(svg, "utf8");
+  if (byteLength > MAX_ROBOT_IMAGE_SVG_BYTES) {
+    throw new Error(`robotImageSvg is too large (${byteLength} bytes). Max ${MAX_ROBOT_IMAGE_SVG_BYTES} bytes.`);
+  }
+
+  const hasSvgRoot =
+    /^<svg[\s\S]*<\/svg>\s*$/i.test(svg) || /^<\?xml[\s\S]*\?>\s*<svg[\s\S]*<\/svg>\s*$/i.test(svg);
+  if (!hasSvgRoot) {
+    throw new Error("robotImageSvg must be a complete SVG document with <svg> root");
+  }
+
+  const blockedPatterns = [
+    /<script[\s>]/i,
+    /<foreignobject[\s>]/i,
+    /<iframe[\s>]/i,
+    /<object[\s>]/i,
+    /<embed[\s>]/i,
+    /<!entity/i,
+    /\son[a-z0-9_-]+\s*=/i,
+    /(xlink:href|href)\s*=\s*["']\s*javascript:/i,
+  ];
+  if (blockedPatterns.some((pattern) => pattern.test(svg))) {
+    throw new Error("robotImageSvg contains unsupported or unsafe markup");
+  }
+
+  return svg;
+}
+
+function isStorageObjectMissingError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const value = error as { code?: unknown; message?: unknown };
+  if (value.code === 404) {
+    return true;
+  }
+
+  return typeof value.message === "string" && /no such object/i.test(value.message);
+}
+
 function serializeRobotDoc(doc: DocumentSnapshot): RobotResponseData {
   const data = requireDocumentData(doc, `Robot ${doc.id}`);
+  const robotImagePath = typeof data.robotImagePath === "string" ? data.robotImagePath : null;
   return {
     id: doc.id,
     creatorNickname: data.creatorNickname,
@@ -180,6 +233,7 @@ function serializeRobotDoc(doc: DocumentSnapshot): RobotResponseData {
     rotationRules: data.rotationRules,
     attackRules: data.attackRules,
     scriptPath: data.scriptPath,
+    robotImagePath,
     commandCount: Array.isArray(data.parsedProgram) ? data.parsedProgram.length : 0,
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
@@ -356,18 +410,39 @@ function isParsedProgramV2(program: unknown): program is ScriptAction[] {
 async function createRobot(robotPayload: unknown): Promise<RobotResponseData> {
   const parsedInput = ROBOT_UPLOAD_SCHEMA.parse(robotPayload);
   const parsedProgram = parseRobotScript(parsedInput.script);
+  const robotImageSvg =
+    typeof parsedInput.robotImageSvg === "string" && parsedInput.robotImageSvg.trim()
+      ? normalizeRobotImageSvg(parsedInput.robotImageSvg)
+      : null;
 
   const robotRef = db.collection("robots").doc();
   const scriptPath = `robots/${robotRef.id}/script.txt`;
+  const robotImagePath = robotImageSvg ? `robots/${robotRef.id}/avatar.svg` : null;
 
   const storageBucket = getStorageBucket();
-  await storageBucket.file(scriptPath).save(parsedInput.script, {
-    contentType: "text/plain; charset=utf-8",
-    resumable: false,
-    metadata: {
-      cacheControl: "no-cache",
-    },
-  });
+  const saveTasks: Promise<unknown>[] = [
+    storageBucket.file(scriptPath).save(parsedInput.script, {
+      contentType: "text/plain; charset=utf-8",
+      resumable: false,
+      metadata: {
+        cacheControl: "no-cache",
+      },
+    }),
+  ];
+
+  if (robotImageSvg && robotImagePath) {
+    saveTasks.push(
+      storageBucket.file(robotImagePath).save(robotImageSvg, {
+        contentType: ROBOT_IMAGE_CONTENT_TYPE,
+        resumable: false,
+        metadata: {
+          cacheControl: "public, max-age=300",
+        },
+      })
+    );
+  }
+
+  await Promise.all(saveTasks);
 
   const timestamp = FieldValue.serverTimestamp();
 
@@ -379,6 +454,7 @@ async function createRobot(robotPayload: unknown): Promise<RobotResponseData> {
     rotationRules: parsedInput.rotationRules,
     attackRules: parsedInput.attackRules,
     scriptPath,
+    robotImagePath,
     parsedProgram,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -599,6 +675,7 @@ export const api = onRequest({ region: "us-central1" }, async (req, res) => {
           endpoints: [
             "GET /health",
             "GET /robots",
+            "GET /robots/:robotId/avatar",
             "POST /robots",
             "POST /battles",
             "GET /battles/:battleId",
@@ -623,6 +700,44 @@ export const api = onRequest({ region: "us-central1" }, async (req, res) => {
         const robots = snapshot.docs.map((doc) => serializeRobotDoc(doc));
         res.json({ robots });
         return;
+      }
+
+      if ((req.method === "GET" || req.method === "HEAD") && /^\/robots\/[^/]+\/avatar$/.test(path)) {
+        const robotId = path.split("/")[2];
+        const robotSnapshot = await db.collection("robots").doc(robotId).get();
+
+        if (!robotSnapshot.exists) {
+          errorResponse(res, 404, `Robot ${robotId} not found`);
+          return;
+        }
+
+        const robotData = requireDocumentData(robotSnapshot, `Robot ${robotId}`);
+        const robotImagePath = typeof robotData.robotImagePath === "string" ? robotData.robotImagePath.trim() : "";
+
+        if (!robotImagePath) {
+          errorResponse(res, 404, `Robot ${robotId} has no avatar`);
+          return;
+        }
+
+        try {
+          const storageBucket = getStorageBucket();
+          const [buffer] = await storageBucket.file(robotImagePath).download();
+          res.setHeader("Content-Type", ROBOT_IMAGE_CONTENT_TYPE);
+          res.setHeader("Cache-Control", "public, max-age=120");
+          if (req.method === "HEAD") {
+            res.status(200).end();
+            return;
+          }
+
+          res.status(200).send(buffer);
+          return;
+        } catch (error) {
+          if (isStorageObjectMissingError(error)) {
+            errorResponse(res, 404, `Robot ${robotId} avatar not found`);
+            return;
+          }
+          throw error;
+        }
       }
 
       if (req.method === "POST" && path === "/robots") {

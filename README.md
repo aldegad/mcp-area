@@ -19,6 +19,12 @@ Firebase Hosting + Functions + Firestore + Storage 기반의 MCP 연동 로봇 �
 
 즉, 단순 업로드가 아니라 **전술 상담 -> 검증 -> 시뮬레이션 -> 업로드**를 MCP 안에서 지원합니다.
 
+## 에이전트 응답 매너 메모
+
+- 기본적으로 존댓말로 응답합니다.
+- 사용자가 승인/허락/협업 제안을 해주면 감사 인사를 명시합니다. (`감사합니다.`)
+- 말투는 간결하게 유지하되, 실행 결과와 근거는 분명하게 전달합니다.
+
 ## 구성
 
 - 모노레포(`yarn workspaces`)
@@ -115,6 +121,7 @@ IF ENEMY_VISIBLE THEN FIRE ON
 - `GET /api/health`
 - `GET /api/robots`
 - `POST /api/robots`
+- `GET /api/robots/:robotId/avatar` (업로드된 SVG 로봇 이미지)
 - `POST /api/battles`
 - `GET /api/battles/:battleId`
 - `POST /api/mcp` (JSON-RPC)
@@ -144,6 +151,7 @@ IF ENEMY_VISIBLE THEN FIRE ON
   - 서버 모드에서는 `opponentScript`를 직접 넣어야 하며 preset 상대는 제공되지 않음
 - `upload_robot_script`
   - 최종 로봇 업로드
+  - 선택적으로 `robotImageSvg`(SVG 문자열)를 함께 전달해 로봇 전용 이미지를 저장 가능
   - `userApprovalConfirmed=true`가 아니면 업로드가 차단됨(최종 사용자 승인 강제)
 
 ## 로컬 실행 (Emulator)

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import {
+  buildRobotAvatarUrl,
   createBattle,
   fetchRobots,
   type Battle,
@@ -43,6 +44,11 @@ function formatCollaborators(agents: Robot["collaboratorAgents"]): string {
   return agents.map((agent) => formatCollaboratorAgent(agent)).join(", ");
 }
 
+function robotInitial(robotName: string): string {
+  const trimmed = robotName.trim();
+  return trimmed ? trimmed.slice(0, 1).toUpperCase() : "R";
+}
+
 function exampleMcpRequest(): Record<string, unknown> {
   return {
     jsonrpc: "2.0",
@@ -59,6 +65,8 @@ function exampleMcpRequest(): Record<string, unknown> {
         attackRules: "적이 보일 때 FIRE ON",
         script:
           "SET THROTTLE 0.75\nSET STRAFE 0.2\nSET TURN 0.2\nFIRE OFF\nIF ENEMY_DY > 0.12 THEN SET TURN 1\nIF ENEMY_DY < -0.12 THEN SET TURN -1\nIF ENEMY_VISIBLE THEN FIRE ON",
+        robotImageSvg:
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#0f172a"/><circle cx="24" cy="28" r="7" fill="#f8fafc"/><circle cx="40" cy="28" r="7" fill="#f8fafc"/><rect x="18" y="42" width="28" height="8" rx="4" fill="#22c55e"/></svg>',
         userApprovalConfirmed: true,
       },
     },
@@ -148,11 +156,25 @@ export default function HomePage() {
         {robots.length ? (
           <ul className="robot-list">
             {robots.map((robot) => (
-              <li key={robot.id}>
-                <strong>{robot.robotName}</strong>
-                <span>by {robot.creatorNickname}</span>
-                <span>agents: {formatCollaborators(robot.collaboratorAgents)}</span>
-                <span>commands: {robot.commandCount}</span>
+              <li key={robot.id} className="robot-item">
+                <div className="robot-avatar-wrap">
+                  {robot.robotImagePath ? (
+                    <img
+                      className="robot-avatar"
+                      src={buildRobotAvatarUrl(robot.id)}
+                      alt={`${robot.robotName} avatar`}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="robot-avatar robot-avatar-fallback">{robotInitial(robot.robotName)}</div>
+                  )}
+                </div>
+                <div className="robot-meta">
+                  <strong>{robot.robotName}</strong>
+                  <span>by {robot.creatorNickname}</span>
+                  <span>agents: {formatCollaborators(robot.collaboratorAgents)}</span>
+                  <span>commands: {robot.commandCount}</span>
+                </div>
               </li>
             ))}
           </ul>
@@ -243,22 +265,93 @@ export default function HomePage() {
           </button>
         </form>
 
-        {lastBattle ? (
+        {lastBattle ? (() => {
+          const { initialState } = lastBattle;
+          const robotAInfo = robots.find((r) => r.id === initialState.robotA.id);
+          const robotBInfo = robots.find((r) => r.id === initialState.robotB.id);
+          const winnerId = lastBattle.winnerRobotId;
+          const winnerInfo = winnerId ? robots.find((r) => r.id === winnerId) : null;
+          const winnerSnapshot = winnerId === initialState.robotA.id
+            ? initialState.robotA
+            : winnerId === initialState.robotB.id
+              ? initialState.robotB
+              : null;
+
+          return (
           <div className="battle-result">
             <h3>최근 배틀 결과</h3>
-            <p>battleId: {lastBattle.id}</p>
-            <p>status: {lastBattle.status}</p>
-            <p>winnerRobotId: {lastBattle.winnerRobotId || "draw"}</p>
-            <p>ticks: {lastBattle.ticks?.length || lastBattle.turns?.length || 0}</p>
+
+            <div className="battle-matchup">
+              <div className="battle-fighter">
+                <div className="battle-fighter-head">
+                  {robotAInfo?.robotImagePath ? (
+                    <img
+                      className="fighter-avatar"
+                      src={buildRobotAvatarUrl(initialState.robotA.id)}
+                      alt={`${initialState.robotA.robotName} avatar`}
+                    />
+                  ) : (
+                    <div className="fighter-avatar fighter-avatar-fallback">{robotInitial(initialState.robotA.robotName)}</div>
+                  )}
+                  <strong>{initialState.robotA.robotName}</strong>
+                </div>
+                {robotAInfo && <span className="fighter-detail">by {robotAInfo.creatorNickname}</span>}
+                {robotAInfo && <span className="fighter-detail">agents: {formatCollaborators(robotAInfo.collaboratorAgents)}</span>}
+              </div>
+              <span className="battle-vs">VS</span>
+              <div className="battle-fighter">
+                <div className="battle-fighter-head">
+                  {robotBInfo?.robotImagePath ? (
+                    <img
+                      className="fighter-avatar"
+                      src={buildRobotAvatarUrl(initialState.robotB.id)}
+                      alt={`${initialState.robotB.robotName} avatar`}
+                    />
+                  ) : (
+                    <div className="fighter-avatar fighter-avatar-fallback">{robotInitial(initialState.robotB.robotName)}</div>
+                  )}
+                  <strong>{initialState.robotB.robotName}</strong>
+                </div>
+                {robotBInfo && <span className="fighter-detail">by {robotBInfo.creatorNickname}</span>}
+                {robotBInfo && <span className="fighter-detail">agents: {formatCollaborators(robotBInfo.collaboratorAgents)}</span>}
+              </div>
+            </div>
+
+            <div className="battle-winner">
+              {winnerId ? (
+                <>
+                  <span className="winner-label">Winner</span>
+                  <strong>{winnerSnapshot?.robotName || winnerId}</strong>
+                  {winnerInfo && <span> (by {winnerInfo.creatorNickname})</span>}
+                </>
+              ) : (
+                <span className="winner-label draw">Draw</span>
+              )}
+            </div>
+
+            <p className="battle-meta">ticks: {lastBattle.ticks?.length || lastBattle.turns?.length || 0}</p>
 
             <ReplayArena battle={lastBattle} />
 
             <details>
               <summary>틱 로그 보기</summary>
+              <div className="tick-log-header">
+                <button
+                  type="button"
+                  className="copy-btn"
+                  onClick={() => {
+                    const text = JSON.stringify(lastBattle.ticks || lastBattle.turns, null, 2);
+                    navigator.clipboard.writeText(text).catch(() => {});
+                  }}
+                >
+                  복사
+                </button>
+              </div>
               <pre>{JSON.stringify(lastBattle.ticks || lastBattle.turns, null, 2)}</pre>
             </details>
           </div>
-        ) : null}
+          );
+        })() : null}
       </section>
 
       <section className="card mcp-card">

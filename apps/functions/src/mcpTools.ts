@@ -354,6 +354,10 @@ const MCP_UPLOAD_TOOL = {
         description:
           "Robot script in parser.js DSL (SET THROTTLE|STRAFE|TURN, FIRE ON|OFF, BOOST LEFT|RIGHT, IF <expr> <op> <expr> THEN ...)",
       },
+      robotImageSvg: {
+        type: "string",
+        description: "Optional robot avatar SVG source text (stored as robots/<id>/avatar.svg)",
+      },
       userApprovalConfirmed: {
         type: "boolean",
         description:
@@ -927,6 +931,7 @@ export function defaultFlowGuide(): BuildFlowResult {
         "rotationRules",
         "attackRules",
         "script",
+        "robotImageSvg(optional)",
       ],
     },
   };
