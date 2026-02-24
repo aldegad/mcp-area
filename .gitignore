@@ -4,6 +4,9 @@ node_modules
 .firebase
 apps/web/.next
 apps/web/out
+apps/functions/lib
+apps/mcp-bridge/dist
+*.tsbuildinfo
 firebase-debug.log
 firestore-debug.log
 *.env.local

@@ -1,6 +1,6 @@
 # mcp-arena (prototype)
 
-Firebase Hosting + Functions + Firestore + Storage 기반의 MCP 연동 로봇 배틀 프로토타입입니다.
+Firebase Hosting + Functions + Firestore + Storage 기반의 MCP 연동 로봇 배틀 프로토타입입니다. (TypeScript)
 
 ## 핵심 아이디어
 
@@ -35,18 +35,19 @@ Firebase Hosting + Functions + Firestore + Storage 기반의 MCP 연동 로봇 �
 ├─ apps/
 │  ├─ functions/
 │  │  └─ src/
-│  │     ├─ index.js         # REST + MCP endpoint (consultative tools 포함)
-│  │     ├─ parser.js        # 로봇 스크립트 DSL parser
-│  │     └─ battleEngine.js  # 전투 엔진 + replay timeline 생성
+│  │     ├─ index.ts         # REST + MCP endpoint (consultative tools 포함)
+│  │     ├─ parser.ts        # 로봇 스크립트 DSL parser
+│  │     └─ battleEngine.ts  # 전투 엔진 + replay timeline 생성
 │  ├─ web/
 │  │  ├─ app/
-│  │  │  ├─ page.js
+│  │  │  ├─ page.tsx
 │  │  │  └─ globals.css
 │  │  ├─ components/
-│  │  │  └─ ArenaReplay.js   # 캔버스 리플레이
+│  │  │  └─ ArenaReplay.tsx  # 캔버스 리플레이
 │  │  └─ .env.local          # 로컬 API base
 │  └─ mcp-bridge/
-│     └─ index.js            # stdio MCP bridge
+│     ├─ index.ts            # stdio MCP bridge source
+│     └─ index.js            # 실행 엔트리 (dist 로더)
 ├─ .mcp.json
 ├─ firebase.json
 ├─ firestore.rules
@@ -55,32 +56,57 @@ Firebase Hosting + Functions + Firestore + Storage 기반의 MCP 연동 로봇 �
 
 ## parser.js DSL
 
-한 줄에 한 명령:
+한 줄에 한 규칙(매 틱 전체 규칙을 위에서 아래로 평가):
 
-- `MOVE <1-3>`: 전진
-- `ROTATE LEFT|RIGHT|NONE` (또는 `ROTATE 0`)
-- `SHOOT`: 전방 5칸 시야 + 직선 사선이 맞으면 타격(원샷킬)
-- `WAIT`
-- `IF_SEEN <MOVE|ROTATE|SHOOT|WAIT ...>`: 적이 보일 때만 실행
-- `IF_NOT_SEEN <MOVE|ROTATE|SHOOT|WAIT ...>`: 적이 안 보일 때만 실행
+- `SET THROTTLE <-1..1>`: 전/후진 입력 (`+` 전진, `-` 후진)
+- `SET STRAFE <-1..1>`: 좌/우 횡이동 입력 (`+` 우, `-` 좌)
+- `SET TURN <-1..1>`: 좌/우 회전 입력 (`+` 우회전, `-` 좌회전)
+- `FIRE` 또는 `FIRE ON|OFF`: 사격 트리거 (에너지 소모)
+- `BOOST LEFT|RIGHT`: 에너지를 소모해 좌/우 횡부스터 대시
+- `IF ENEMY_VISIBLE THEN <COMMAND>`
+- `IF NOT ENEMY_VISIBLE THEN <COMMAND>`
+- `IF <EXPR> <OP> <EXPR> THEN <COMMAND>`
+- `IF (<COND>) AND (<COND>) THEN <COMMAND>`
+- `IF (<COND>) OR (<COND>) THEN <COMMAND>`
+- `IF NOT (<COND>) THEN <COMMAND>`
+  - 센서: `ARENA_SIZE`, `SELF_X`, `SELF_Y`, `SELF_HEADING`, `SELF_ENERGY`, `BOOST_COOLDOWN`, `TICKS_SINCE_ENEMY_SEEN`, `ENEMY_X`, `ENEMY_Y`, `ENEMY_HEADING`, `ENEMY_DX`, `ENEMY_DY`, `ENEMY_DISTANCE`, `PREV_ENEMY_X`, `PREV_ENEMY_Y`, `PREV_ENEMY_HEADING`, `PREV_ENEMY_DX`, `PREV_ENEMY_DY`, `PREV_ENEMY_DISTANCE`, `ENEMY_DX_DELTA`, `ENEMY_DY_DELTA`, `ENEMY_DISTANCE_DELTA`, `WALL_AHEAD_DISTANCE`, `WALL_LEFT_DISTANCE`, `WALL_RIGHT_DISTANCE`, `WALL_BACK_DISTANCE`, `WALL_NEAREST_DISTANCE`
+  - 수식: `+`, `-`, `*`, `/`, `()`, 상수 `PI`, `TAU`
+  - 함수: `ATAN2(y, x)`, `ANGLE_DIFF(targetDeg, currentDeg)`, `NORMALIZE_ANGLE(angleDeg)`, `ABS(x)`, `MIN(a,b)`, `MAX(a,b)`, `CLAMP(x,min,max)`
+  - 비교 연산자: `>`, `>=`, `<`, `<=`, `==`, `!=`
+  - 논리 연산자: `AND`, `OR`, `NOT` (괄호 우선순위 지원)
 - `#` 주석
 
 예시:
 
 ```txt
-IF_SEEN SHOOT
-MOVE 1
-IF_NOT_SEEN ROTATE RIGHT
-IF_SEEN SHOOT
-WAIT
+SET THROTTLE 0.7
+SET STRAFE 0.15
+SET TURN 0.2
+FIRE OFF
+IF ANGLE_DIFF(ATAN2(ENEMY_DY, ENEMY_DX), SELF_HEADING) > 4 THEN SET TURN 1
+IF ANGLE_DIFF(ATAN2(ENEMY_DY, ENEMY_DX), SELF_HEADING) < -4 THEN SET TURN -1
+IF ENEMY_DISTANCE < 1.8 THEN SET THROTTLE -0.6
+IF ENEMY_VISIBLE THEN FIRE ON
 ```
 
 ## 자동 시야 규칙
 
-- 매 턴 자동으로 시야 정보가 갱신됩니다 (별도 `SCAN` 불필요)
-- 시야 범위: 전방 반원, 반경 5칸
-- 시야 데이터: `enemyVisible`, `enemy.dx`, `enemy.dy`, `enemy.distance`, `enemy.bearing`
+- 매 틱 자동으로 시야 정보가 갱신됩니다 (별도 `SCAN` 불필요)
+- 시야 범위: 전방 반원, 반경 8칸
+- 총 사거리: 전방 5칸 (시야와 별도)
+- 시야 데이터: `enemyVisible`, `enemy.dx`, `enemy.dy`, `enemy.distance`, `enemy.bearing`, `enemy.headingDeg`, `enemy.headingDirection`, `wall.aheadDistance`, `wall.leftDistance`, `wall.rightDistance`, `wall.backDistance`, `wall.sightArc(leftEdge/center/rightEdge)`
 - 배틀 로그(`timeline`)에도 각 액션의 `perceptionBefore`/`perceptionAfter`가 포함됩니다.
+
+## 실시간 틱 규칙
+
+- 전투는 턴제가 아니라 **실시간 틱** 기반으로 진행됩니다.
+- 이동/회전/사격 입력은 같은 틱에 중복 적용됩니다.
+- 이동 속도 우선순위: 전진(빠름) > 횡이동(중간) > 후진(느림)
+- `FIRE ON` 상태에서는 이동 속도와 회전 속도가 각각 절반으로 감소합니다.
+- 사격은 쿨다운 1틱 개념이며(실질적으로 매 틱 발사 가능), 에너지(`SELF_ENERGY`)를 소모합니다.
+- 발사체는 즉시 명중하지 않고 비행 시간을 가집니다(현재 `2틱/칸`, 사거리 5칸이면 최대 약 10틱 비행).
+- 사이드 부스터(`BOOST LEFT|RIGHT`)는 발동 후 5틱 동안 `5→4→3→2→1` 강제 횡이동(총 15틱 분량)을 수행합니다.
+- 사이드 부스터는 에너지(`SELF_ENERGY`)를 소모하고 쿨다운(`BOOST_COOLDOWN`, 10틱)을 사용합니다.
 
 ## API
 
@@ -95,9 +121,13 @@ WAIT
 
 배틀 결과에는 리플레이용 데이터가 포함됩니다.
 
+- `maxTicks`
+- `tickDurationMs`
+- `projectileTiming`
+- `movementTiming`
 - `initialState`
 - `timeline` (액션별 `before`/`after`, 탄환 궤적)
-- `turns`
+- `ticks` (`turns`는 하위호환 alias)
 - `finalState`
 
 ## MCP 툴 목록 (상담형)
@@ -111,6 +141,7 @@ WAIT
   - DSL 문법 + 전술 품질 체크(경고/추천)
 - `preview_robot_duel`
   - 후보 스크립트를 프리뷰 배틀로 점검
+  - 서버 모드에서는 `opponentScript`를 직접 넣어야 하며 preset 상대는 제공되지 않음
 - `upload_robot_script`
   - 최종 로봇 업로드
   - `userApprovalConfirmed=true`가 아니면 업로드가 차단됨(최종 사용자 승인 강제)
@@ -132,6 +163,11 @@ WAIT
 yarn install
 yarn emulators
 ```
+
+로컬 테스트용 preset 상대:
+
+- `preview_robot_duel`의 preset 상대는 로컬 에뮬레이터(`FUNCTIONS_EMULATOR=true`)에서만 허용됩니다.
+- 필요하면 `MCP_ARENA_ENABLE_PRESETS=1`로 명시 활성화할 수 있습니다.
 
 별도 터미널:
 
@@ -230,10 +266,15 @@ firebase deploy --only hosting,functions,firestore,storage
 - 정사각형 아레나
 - 로봇 2대
 - 시작 위치 `(0,0)` vs `(N-1,N-1)`
-- 명령 루프 실행
-- 전방 5칸 자동 시야 갱신
-- 조건 분기(`IF_SEEN`, `IF_NOT_SEEN`) 지원
-- `SHOOT` 적중 시 즉시 사망
+- 실시간 틱 단위로 명령 실행
+- 전방 8칸 자동 시야 갱신
+- 총 사거리 5칸
+- 이동 속도: 전진(`THROTTLE>0`) > `STRAFE` > 후진(`THROTTLE<0`)
+- 사격: 쿨다운 1틱 개념(실질 매틱 발사 가능) + 공용 에너지 소모
+- 투사체: 발사 후 틱 단위 비행(즉시 명중 아님, 회피 가능)
+- 사이드 부스터: `BOOST LEFT|RIGHT` (5틱 강제 횡이동 + 에너지/10틱 쿨다운)
+- 조건 분기(`IF ... THEN`) + 수식 비교 + 논리 연산(`AND/OR/NOT`) + 관측 메모리 센서 지원
+- `FIRE` 적중 시 즉시 사망
 - 승자 없으면 `draw`
 
 ## 주의

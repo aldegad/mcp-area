@@ -11,10 +11,11 @@
   "scripts": {
     "build:functions": "yarn workspace @mcp-arena/functions build",
     "build:web": "yarn workspace @mcp-arena/web build",
+    "build:mcp-bridge": "yarn workspace @mcp-arena/mcp-bridge build",
     "dev:functions": "yarn workspace @mcp-arena/functions serve",
     "dev:mcp-bridge": "yarn workspace @mcp-arena/mcp-bridge dev",
     "dev:web": "yarn workspace @mcp-arena/web dev",
-    "emulators": "firebase emulators:start --only hosting,functions,firestore,storage",
+    "emulators": "yarn build:functions && firebase emulators:start --only hosting,functions,firestore,storage",
     "lint": "yarn workspace @mcp-arena/web lint"
   }
 }

@@ -2,8 +2,13 @@
   "name": "@mcp-arena/mcp-bridge",
   "version": "0.1.0",
   "private": true,
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "dev": "node index.js"
+    "build": "tsc -p tsconfig.json",
+    "dev": "yarn build && node index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "typescript": "^5.9.2"
   }
 }
