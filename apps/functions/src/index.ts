@@ -64,7 +64,7 @@ const ROBOT_UPLOAD_SCHEMA = z.object({
   rotationRules: z.string().max(1000).default(""),
   attackRules: z.string().min(1).max(1000),
   script: z.string().min(1).max(10000),
-  robotImageSvg: z.string().max(MAX_ROBOT_IMAGE_SVG_CHARS).optional(),
+  robotImageSvg: z.string().min(1).max(MAX_ROBOT_IMAGE_SVG_CHARS),
 });
 
 const MCP_UPLOAD_COLLABORATOR_SCHEMA = z.object({
@@ -187,7 +187,7 @@ function serializeTimestamp(value: unknown): string | null {
 function normalizeRobotImageSvg(svgInput: string): string {
   const svg = svgInput.trim();
   if (!svg) {
-    throw new Error("robotImageSvg must not be empty when provided");
+    throw new Error("robotImageSvg must not be empty");
   }
 
   const byteLength = Buffer.byteLength(svg, "utf8");
@@ -420,14 +420,11 @@ function isParsedProgramV2(program: unknown): program is ScriptAction[] {
 async function createRobot(robotPayload: unknown): Promise<RobotResponseData> {
   const parsedInput = ROBOT_UPLOAD_SCHEMA.parse(robotPayload);
   const parsedProgram = parseRobotScript(parsedInput.script);
-  const robotImageSvg =
-    typeof parsedInput.robotImageSvg === "string" && parsedInput.robotImageSvg.trim()
-      ? normalizeRobotImageSvg(parsedInput.robotImageSvg)
-      : null;
+  const robotImageSvg = normalizeRobotImageSvg(parsedInput.robotImageSvg);
 
   const robotRef = db.collection("robots").doc();
   const scriptPath = `robots/${robotRef.id}/script.txt`;
-  const robotImagePath = robotImageSvg ? `robots/${robotRef.id}/avatar.svg` : null;
+  const robotImagePath = `robots/${robotRef.id}/avatar.svg`;
 
   const storageBucket = getStorageBucket();
   const saveTasks: Promise<unknown>[] = [
@@ -438,19 +435,14 @@ async function createRobot(robotPayload: unknown): Promise<RobotResponseData> {
         cacheControl: "no-cache",
       },
     }),
+    storageBucket.file(robotImagePath).save(robotImageSvg, {
+      contentType: ROBOT_IMAGE_CONTENT_TYPE,
+      resumable: false,
+      metadata: {
+        cacheControl: "public, max-age=300",
+      },
+    }),
   ];
-
-  if (robotImageSvg && robotImagePath) {
-    saveTasks.push(
-      storageBucket.file(robotImagePath).save(robotImageSvg, {
-        contentType: ROBOT_IMAGE_CONTENT_TYPE,
-        resumable: false,
-        metadata: {
-          cacheControl: "public, max-age=300",
-        },
-      })
-    );
-  }
 
   await Promise.all(saveTasks);
 

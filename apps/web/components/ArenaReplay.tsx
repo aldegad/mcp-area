@@ -359,23 +359,18 @@ function drawRobot(
   const cy = robot.y * cellSize + cellSize / 2;
   const radius = cellSize * 0.32;
 
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.closePath();
-
   if (avatarImage) {
     ctx.save();
-    ctx.clip();
     ctx.drawImage(avatarImage, cx - radius, cy - radius, radius * 2, radius * 2);
     if (!robot.alive) {
       ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
       ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
     }
     ctx.restore();
-    ctx.lineWidth = Math.max(2, Math.floor(cellSize * 0.06));
-    ctx.strokeStyle = robot.alive ? color : "#7d7d7d";
-    ctx.stroke();
   } else {
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.closePath();
     ctx.fillStyle = robot.alive ? color : "#999";
     ctx.fill();
   }

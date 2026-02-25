@@ -30,7 +30,7 @@ export interface UploadRobotPayload {
   rotationRules: string;
   attackRules: string;
   script: string;
-  robotImageSvg?: string;
+  robotImageSvg: string;
 }
 
 export interface RobotStateSnapshot {

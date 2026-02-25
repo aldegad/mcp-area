@@ -356,7 +356,7 @@ const MCP_UPLOAD_TOOL = {
       },
       robotImageSvg: {
         type: "string",
-        description: "Optional robot avatar SVG source text (stored as robots/<id>/avatar.svg)",
+        description: "Required robot avatar SVG source text (stored as robots/<id>/avatar.svg)",
       },
       userApprovalConfirmed: {
         type: "boolean",
@@ -371,6 +371,7 @@ const MCP_UPLOAD_TOOL = {
       "movementRules",
       "attackRules",
       "script",
+      "robotImageSvg",
       "userApprovalConfirmed",
     ],
   },
@@ -948,7 +949,7 @@ export function defaultFlowGuide(): BuildFlowResult {
         "rotationRules",
         "attackRules",
         "script",
-        "robotImageSvg(optional)",
+        "robotImageSvg(required)",
       ],
     },
   };

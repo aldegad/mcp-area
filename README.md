@@ -152,7 +152,7 @@ IF ENEMY_VISIBLE THEN FIRE ON
 - `upload_robot_script`
   - 최종 로봇 업로드
   - `collaboratorAgents`는 최소 1개 이상이며 각 항목은 `{name, version, role?}` 형식을 권장
-  - 선택적으로 `robotImageSvg`(SVG 문자열)를 함께 전달해 로봇 전용 이미지를 저장 가능
+  - `robotImageSvg`(SVG 문자열)는 필수이며, 로봇 전용 이미지를 저장
   - `userApprovalConfirmed=true`가 아니면 업로드가 차단됨(최종 사용자 승인 강제)
 
 ## 로컬 실행 (Emulator)
