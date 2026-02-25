@@ -67,6 +67,16 @@ const ROBOT_UPLOAD_SCHEMA = z.object({
   robotImageSvg: z.string().max(MAX_ROBOT_IMAGE_SVG_CHARS).optional(),
 });
 
+const MCP_UPLOAD_COLLABORATOR_SCHEMA = z.object({
+  name: z.string().min(1).max(120),
+  version: z.string().min(1).max(120),
+  role: z.string().max(120).optional(),
+});
+
+const MCP_ROBOT_UPLOAD_SCHEMA = ROBOT_UPLOAD_SCHEMA.extend({
+  collaboratorAgents: z.array(MCP_UPLOAD_COLLABORATOR_SCHEMA).min(1).max(20),
+});
+
 const CREATE_BATTLE_SCHEMA = z
   .object({
     robotAId: z.string().min(1),
@@ -631,7 +641,8 @@ async function handleMcpRequest(body: JsonObject): Promise<JsonRpcResponse<unkno
         };
         delete uploadPayload.userApprovalConfirmed;
 
-        const createdRobot = await createRobot(uploadPayload);
+        const normalizedUploadPayload = MCP_ROBOT_UPLOAD_SCHEMA.parse(uploadPayload);
+        const createdRobot = await createRobot(normalizedUploadPayload);
         const uploadResult: UploadRobotToolResult = {
           ok: true,
           robotId: createdRobot.id,

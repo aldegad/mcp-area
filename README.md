@@ -75,7 +75,7 @@ Firebase Hosting + Functions + Firestore + Storage 기반의 MCP 연동 로봇 �
 - `IF (<COND>) AND (<COND>) THEN <COMMAND>`
 - `IF (<COND>) OR (<COND>) THEN <COMMAND>`
 - `IF NOT (<COND>) THEN <COMMAND>`
-  - 센서: `ARENA_SIZE`, `SELF_X`, `SELF_Y`, `SELF_HEADING`, `SELF_ENERGY`, `BOOST_COOLDOWN`, `TICKS_SINCE_ENEMY_SEEN`, `ENEMY_X`, `ENEMY_Y`, `ENEMY_HEADING`, `ENEMY_DX`, `ENEMY_DY`, `ENEMY_DISTANCE`, `PREV_ENEMY_X`, `PREV_ENEMY_Y`, `PREV_ENEMY_HEADING`, `PREV_ENEMY_DX`, `PREV_ENEMY_DY`, `PREV_ENEMY_DISTANCE`, `ENEMY_DX_DELTA`, `ENEMY_DY_DELTA`, `ENEMY_DISTANCE_DELTA`, `WALL_AHEAD_DISTANCE`, `WALL_LEFT_DISTANCE`, `WALL_RIGHT_DISTANCE`, `WALL_BACK_DISTANCE`, `WALL_NEAREST_DISTANCE`
+  - 센서: `ARENA_SIZE`, `SHOT_RANGE`, `SHOT_HIT_RADIUS`, `SELF_X`, `SELF_Y`, `SELF_HEADING`, `SELF_ENERGY`, `BOOST_COOLDOWN`, `TICKS_SINCE_ENEMY_SEEN`, `ENEMY_X`, `ENEMY_Y`, `ENEMY_HEADING`, `ENEMY_DX`, `ENEMY_DY`, `ENEMY_DISTANCE`, `ENEMY_FORWARD_DISTANCE`, `ENEMY_LATERAL_OFFSET`, `PREV_ENEMY_X`, `PREV_ENEMY_Y`, `PREV_ENEMY_HEADING`, `PREV_ENEMY_DX`, `PREV_ENEMY_DY`, `PREV_ENEMY_DISTANCE`, `ENEMY_DX_DELTA`, `ENEMY_DY_DELTA`, `ENEMY_DISTANCE_DELTA`, `WALL_AHEAD_DISTANCE`, `WALL_LEFT_DISTANCE`, `WALL_RIGHT_DISTANCE`, `WALL_BACK_DISTANCE`, `WALL_NEAREST_DISTANCE`
   - 수식: `+`, `-`, `*`, `/`, `()`, 상수 `PI`, `TAU`
   - 함수: `ATAN2(y, x)`, `ANGLE_DIFF(targetDeg, currentDeg)`, `NORMALIZE_ANGLE(angleDeg)`, `ABS(x)`, `MIN(a,b)`, `MAX(a,b)`, `CLAMP(x,min,max)`
   - 비교 연산자: `>`, `>=`, `<`, `<=`, `==`, `!=`
@@ -151,6 +151,7 @@ IF ENEMY_VISIBLE THEN FIRE ON
   - 서버 모드에서는 `opponentScript`를 직접 넣어야 하며 preset 상대는 제공되지 않음
 - `upload_robot_script`
   - 최종 로봇 업로드
+  - `collaboratorAgents`는 최소 1개 이상이며 각 항목은 `{name, version, role?}` 형식을 권장
   - 선택적으로 `robotImageSvg`(SVG 문자열)를 함께 전달해 로봇 전용 이미지를 저장 가능
   - `userApprovalConfirmed=true`가 아니면 업로드가 차단됨(최종 사용자 승인 강제)
 

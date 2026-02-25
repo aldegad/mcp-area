@@ -6,6 +6,8 @@ export type BoostDirection = "LEFT" | "RIGHT";
 
 export type SensorVariable =
   | "ARENA_SIZE"
+  | "SHOT_RANGE"
+  | "SHOT_HIT_RADIUS"
   | "SELF_X"
   | "SELF_Y"
   | "SELF_HEADING"
@@ -18,6 +20,8 @@ export type SensorVariable =
   | "ENEMY_DX"
   | "ENEMY_DY"
   | "ENEMY_DISTANCE"
+  | "ENEMY_FORWARD_DISTANCE"
+  | "ENEMY_LATERAL_OFFSET"
   | "PREV_ENEMY_X"
   | "PREV_ENEMY_Y"
   | "PREV_ENEMY_HEADING"
@@ -137,6 +141,8 @@ export interface ScriptAction {
 
 const SENSOR_VARIABLES: SensorVariable[] = [
   "ARENA_SIZE",
+  "SHOT_RANGE",
+  "SHOT_HIT_RADIUS",
   "SELF_X",
   "SELF_Y",
   "SELF_HEADING",
@@ -149,6 +155,8 @@ const SENSOR_VARIABLES: SensorVariable[] = [
   "ENEMY_DX",
   "ENEMY_DY",
   "ENEMY_DISTANCE",
+  "ENEMY_FORWARD_DISTANCE",
+  "ENEMY_LATERAL_OFFSET",
   "PREV_ENEMY_X",
   "PREV_ENEMY_Y",
   "PREV_ENEMY_HEADING",

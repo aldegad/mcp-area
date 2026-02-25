@@ -21,13 +21,13 @@ const REPLAY_FRAMES_PER_TICK = 1;
 export const FIRE_MOVEMENT_MULTIPLIER = 0.5;
 export const FIRE_TURN_MULTIPLIER = 0.5;
 export const FIRE_COOLDOWN_TICKS = 1;
-export const FIRE_ENERGY_COST = 6;
+export const FIRE_ENERGY_COST = 10;
 export const PROJECTILE_TICKS_PER_TILE = 2;
 export const SIDE_BOOST_FORCE_SEQUENCE = [5, 4, 3, 2, 1] as const;
 export const SIDE_BOOST_BURST_TICKS = SIDE_BOOST_FORCE_SEQUENCE.length;
 export const SIDE_BOOST_TOTAL_EQUIVALENT_STRAFE_TICKS = 15;
 export const SIDE_BOOST_ENERGY_MAX = 100;
-export const SIDE_BOOST_ENERGY_COST = 35;
+export const SIDE_BOOST_ENERGY_COST = 10;
 export const SIDE_BOOST_ENERGY_REGEN_PER_SECOND = 15;
 export const SIDE_BOOST_COOLDOWN_TICKS = 10;
 const EPSILON = 0.000001;
@@ -701,6 +701,9 @@ function buildSensorContext(
   const selfHeadingDeg = normalizeHeadingDeg((actor.headingRad * 180) / Math.PI);
   const memory = actor.enemyMemory;
   const currentEnemy = perception.enemyVisible && perception.enemy ? perception.enemy : null;
+  const currentEnemyLocal = currentEnemy
+    ? toLocalCoordinates(actor.headingRad, currentEnemy.dx, currentEnemy.dy)
+    : null;
 
   const enemyDxDelta =
     currentEnemy && memory.prevEnemyDx !== null ? Number((currentEnemy.dx - memory.prevEnemyDx).toFixed(4)) : null;
@@ -713,6 +716,8 @@ function buildSensorContext(
 
   const values: Record<SensorVariable, number | null> = {
     ARENA_SIZE: arenaSize,
+    SHOT_RANGE,
+    SHOT_HIT_RADIUS,
     SELF_X: Number(actor.x.toFixed(4)),
     SELF_Y: Number(actor.y.toFixed(4)),
     SELF_HEADING: Number(selfHeadingDeg.toFixed(2)),
@@ -725,6 +730,8 @@ function buildSensorContext(
     ENEMY_DX: null,
     ENEMY_DY: null,
     ENEMY_DISTANCE: null,
+    ENEMY_FORWARD_DISTANCE: null,
+    ENEMY_LATERAL_OFFSET: null,
     PREV_ENEMY_X: memory.prevEnemyX,
     PREV_ENEMY_Y: memory.prevEnemyY,
     PREV_ENEMY_HEADING: memory.prevEnemyHeading,
@@ -748,6 +755,8 @@ function buildSensorContext(
     values.ENEMY_DX = currentEnemy.dx;
     values.ENEMY_DY = currentEnemy.dy;
     values.ENEMY_DISTANCE = currentEnemy.distance;
+    values.ENEMY_FORWARD_DISTANCE = Number((currentEnemyLocal?.forward ?? 0).toFixed(4));
+    values.ENEMY_LATERAL_OFFSET = Number((currentEnemyLocal?.lateral ?? 0).toFixed(4));
   }
 
   return {

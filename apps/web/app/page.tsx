@@ -58,7 +58,10 @@ function exampleMcpRequest(): Record<string, unknown> {
       name: "upload_robot_script",
       arguments: {
         creatorNickname: "soohong",
-        collaboratorAgents: ["codex", "claude-code"],
+        collaboratorAgents: [
+          { name: "codex", version: "3.5", role: "builder" },
+          { name: "opus", version: "4.6", role: "review" },
+        ],
         robotName: "MCP-Striker",
         movementRules: "THROTTLE 기반 전진 + 필요시 후진",
         rotationRules: "ENEMY_DY 부호에 맞춰 TURN 보정",

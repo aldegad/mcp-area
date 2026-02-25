@@ -103,7 +103,11 @@ interface RobotDraft {
   rotationRules: string;
   attackRules: string;
   script: string;
-  collaboratorAgentsHint: string[];
+  collaboratorAgentsHint: Array<{
+    name: string;
+    version: string;
+    role?: string;
+  }>;
 }
 
 export interface BuildFlowResult {
@@ -317,20 +321,16 @@ const MCP_UPLOAD_TOOL = {
       },
       collaboratorAgents: {
         type: "array",
-        description: "List of collaborating AI agents",
+        description: "List of collaborating AI agents. Must include exact name and version.",
+        minItems: 1,
         items: {
-          oneOf: [
-            { type: "string" },
-            {
-              type: "object",
-              properties: {
-                name: { type: "string" },
-                role: { type: "string" },
-                version: { type: "string" },
-              },
-              required: ["name"],
-            },
-          ],
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            role: { type: "string" },
+            version: { type: "string" },
+          },
+          required: ["name", "version"],
         },
       },
       robotName: {
@@ -366,6 +366,7 @@ const MCP_UPLOAD_TOOL = {
     },
     required: [
       "creatorNickname",
+      "collaboratorAgents",
       "robotName",
       "movementRules",
       "attackRules",
@@ -583,7 +584,10 @@ function recommendRobotDraft(input: McpCoachInput): RobotDraft {
     rotationRules: template.rotationRules,
     attackRules: template.attackRules,
     script,
-    collaboratorAgentsHint: ["codex", "claude-code"],
+    collaboratorAgentsHint: [
+      { name: "codex", version: "3.5", role: "builder" },
+      { name: "opus", version: "4.6", role: "review" },
+    ],
   };
 }
 
@@ -832,6 +836,8 @@ export function arenaRulesGuide(): ArenaRulesResult {
       { name: "BOOST_COOLDOWN", description: "사이드 부스터 재사용까지 남은 틱", available: "항상" },
       { name: "TICKS_SINCE_ENEMY_SEEN", description: "적을 마지막으로 본 뒤 경과 틱 수", available: "항상" },
       { name: "ARENA_SIZE", description: "아레나 크기 N", available: "항상" },
+      { name: "SHOT_RANGE", description: "현재 사거리(칸)", available: "항상" },
+      { name: "SHOT_HIT_RADIUS", description: "탄환 판정 반지름(정면선 기준 lateral 허용치)", available: "항상" },
       { name: "ENEMY_VISIBLE", description: "적이 시야 내에 있는지 (boolean, IF 전용)", available: "항상" },
       { name: "ENEMY_X", description: "적의 X 좌표", available: "적 가시시만" },
       { name: "ENEMY_Y", description: "적의 Y 좌표", available: "적 가시시만" },
@@ -839,6 +845,16 @@ export function arenaRulesGuide(): ArenaRulesResult {
       { name: "ENEMY_DX", description: "적과의 X 좌표 차이 (월드 좌표: opponent.x - self.x)", available: "적 가시시만" },
       { name: "ENEMY_DY", description: "적과의 Y 좌표 차이 (월드 좌표: opponent.y - self.y)", available: "적 가시시만" },
       { name: "ENEMY_DISTANCE", description: "적과의 유클리드 거리", available: "적 가시시만" },
+      {
+        name: "ENEMY_FORWARD_DISTANCE",
+        description: "적의 전방 거리(heading 기준 forward 성분, +면 정면, -면 후방)",
+        available: "적 가시시만",
+      },
+      {
+        name: "ENEMY_LATERAL_OFFSET",
+        description: "적의 좌우 편차(heading 기준 lateral 성분, +우측, -좌측)",
+        available: "적 가시시만",
+      },
       { name: "PREV_ENEMY_X", description: "직전 마지막 가시 시점의 적 X 좌표", available: "한 번이라도 적을 본 이후" },
       { name: "PREV_ENEMY_Y", description: "직전 마지막 가시 시점의 적 Y 좌표", available: "한 번이라도 적을 본 이후" },
       {
@@ -894,6 +910,7 @@ export function arenaRulesGuide(): ArenaRulesResult {
       "벽 회피에 WALL_AHEAD_DISTANCE보다 SELF_X/SELF_Y가 효율적 (heading 무관하게 가장자리 감지)",
       "시작 위치가 (0,0) vs (N-1,N-1) 대각선이라 직선 전진만으로는 조우 불가. 대각선 접근 또는 회전 탐색 필요",
       `시야는 ${VISION_RADIUS}칸이지만 사격은 ${SHOT_RANGE}칸. 먼저 보고(탐지) 접근한 뒤 발사 각을 맞추는 운영이 중요`,
+      "정면 사격 판정은 ENEMY_FORWARD_DISTANCE와 ENEMY_LATERAL_OFFSET으로 직접 제어 가능",
       `SHOT_HIT_RADIUS=${SHOT_HIT_RADIUS}이므로 정면 정렬이 매우 중요. SET TURN으로 미세 조준 필수`,
       `FIRE는 ${FIRE_COOLDOWN_TICKS}틱 쿨다운 개념이지만 실질적으로는 매틱 발사가 가능. 대신 사격 에너지 관리가 핵심`,
       `발사체 속도는 ${PROJECTILE_TICKS_PER_TILE}틱/칸(${PROJECTILE_SPEED_TILES_PER_SECOND.toFixed(
@@ -925,7 +942,7 @@ export function defaultFlowGuide(): BuildFlowResult {
     outputContract: {
       finalUploadFields: [
         "creatorNickname",
-        "collaboratorAgents",
+        "collaboratorAgents(required: [{ name, version, role? }], min 1)",
         "robotName",
         "movementRules",
         "rotationRules",
@@ -1044,6 +1061,6 @@ export function previewRobotDuel(input: McpPreviewInput): PreviewRobotDuelResult
 }
 
 export const MCP_SERVER_INSTRUCTIONS =
-  `Robots fight in real-time ticks with auto-updated forward vision (radius ${VISION_RADIUS}) and shot range ${SHOT_RANGE}. Script controls are SET THROTTLE/STRAFE/TURN, FIRE ON|OFF, and BOOST LEFT|RIGHT with IF ... THEN conditions. IF supports comparisons (<EXPR> <OP> <EXPR>), logical operators (AND/OR/NOT), and parentheses. Expressions support +,-,*,/,(), sensors, and functions ATAN2/ANGLE_DIFF/NORMALIZE_ANGLE/ABS/MIN/MAX/CLAMP. Memory sensors are available: TICKS_SINCE_ENEMY_SEEN, PREV_ENEMY_X/Y/HEADING/DX/DY/DISTANCE, ENEMY_DX_DELTA, ENEMY_DY_DELTA, ENEMY_DISTANCE_DELTA. Movement and turning while firing are each reduced to half speed. FIRE has a ${FIRE_COOLDOWN_TICKS}-tick conceptual cooldown (effectively can fire every tick) but consumes shared energy. Fired projectiles travel over time (${PROJECTILE_TICKS_PER_TILE} ticks per tile), so dodging before impact is possible. Side boost uses shared energy and ${SIDE_BOOST_COOLDOWN_TICKS}-tick cooldown, then forces lateral movement for ${SIDE_BOOST_BURST_TICKS} ticks with profile ${SIDE_BOOST_FORCE_SEQUENCE.join(
+  `Robots fight in real-time ticks with auto-updated forward vision (radius ${VISION_RADIUS}) and shot range ${SHOT_RANGE}. Script controls are SET THROTTLE/STRAFE/TURN, FIRE ON|OFF, and BOOST LEFT|RIGHT with IF ... THEN conditions. IF supports comparisons (<EXPR> <OP> <EXPR>), logical operators (AND/OR/NOT), and parentheses. Expressions support +,-,*,/,(), sensors, and functions ATAN2/ANGLE_DIFF/NORMALIZE_ANGLE/ABS/MIN/MAX/CLAMP. Useful firing sensors are SHOT_RANGE, SHOT_HIT_RADIUS, ENEMY_FORWARD_DISTANCE, and ENEMY_LATERAL_OFFSET. Memory sensors are available: TICKS_SINCE_ENEMY_SEEN, PREV_ENEMY_X/Y/HEADING/DX/DY/DISTANCE, ENEMY_DX_DELTA, ENEMY_DY_DELTA, ENEMY_DISTANCE_DELTA. Movement and turning while firing are each reduced to half speed. FIRE has a ${FIRE_COOLDOWN_TICKS}-tick conceptual cooldown (effectively can fire every tick) but consumes shared energy. Fired projectiles travel over time (${PROJECTILE_TICKS_PER_TILE} ticks per tile), so dodging before impact is possible. Side boost uses shared energy and ${SIDE_BOOST_COOLDOWN_TICKS}-tick cooldown, then forces lateral movement for ${SIDE_BOOST_BURST_TICKS} ticks with profile ${SIDE_BOOST_FORCE_SEQUENCE.join(
     "->"
   )}. Server mode does not provide preset opponents; duels use explicitly provided scripts. Recommended flow: get_build_flow -> coach_robot_design (iterate with user Q&A) -> validate_robot_script -> preview_robot_duel -> upload_robot_script.`;
